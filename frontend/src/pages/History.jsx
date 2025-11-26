@@ -19,22 +19,39 @@ export default function History() {
       setHistory(response.data.history || []);
       setError('');
     } catch (err) {
+      console.error('History fetch error:', err);
       setError(err.response?.data?.message || 'Failed to fetch history');
     } finally {
       setLoading(false);
     }
   };
 
-  const getComplianceColor = (status) => {
+  const getComplianceStyle = (status) => {
     switch (status) {
       case 'on-track':
-        return 'bg-green-100 border-green-400 text-green-800';
+        return {
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          borderColor: 'var(--success-color)',
+          color: 'var(--success-color)',
+        };
       case 'over':
-        return 'bg-red-100 border-red-400 text-red-800';
+        return {
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          borderColor: 'var(--error-color)',
+          color: 'var(--error-color)',
+        };
       case 'under':
-        return 'bg-yellow-100 border-yellow-400 text-yellow-800';
+        return {
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          borderColor: 'var(--warning-color)',
+          color: 'var(--warning-color)',
+        };
       default:
-        return 'bg-gray-100 border-gray-400 text-gray-800';
+        return {
+          backgroundColor: 'var(--gray-100)',
+          borderColor: 'var(--gray-400)',
+          color: 'var(--gray-800)',
+        };
     }
   };
 
@@ -63,99 +80,256 @@ export default function History() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your history...</p>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        minHeight: '100vh',
+        background: 'var(--gradient-primary)'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+          <p style={{ color: 'var(--white)', fontSize: '1.1rem' }}>Loading your history...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div style={{ 
+      minHeight: '100vh',
+      background: 'var(--gradient-primary)',
+      padding: '2rem 1rem'
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Header */}
-        <div className="mb-8">
+        <div style={{ marginBottom: '2rem' }}>
           <button
             onClick={() => navigate('/dashboard')}
-            className="text-blue-600 hover:text-blue-800 font-semibold mb-4 flex items-center"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--white)',
+              fontSize: '1rem',
+              fontWeight: '600',
+              marginBottom: '1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'opacity 0.2s ease'
+            }}
+            onMouseOver={(e) => e.target.style.opacity = '0.8'}
+            onMouseOut={(e) => e.target.style.opacity = '1'}
           >
             ← Back to Dashboard
           </button>
-          <h1 className="text-4xl font-bold text-gray-800">History</h1>
-          <p className="text-gray-600 mt-2">Your last 7-10 days of nutrition tracking</p>
+          <h1 style={{ 
+            fontSize: '3rem', 
+            fontWeight: '700', 
+            color: 'var(--white)',
+            marginBottom: '0.5rem',
+            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}>
+            History
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '1.1rem' }}>
+            Your last 10 days of nutrition tracking
+          </p>
         </div>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.9)',
+            border: '2px solid var(--error-color)',
+            color: 'var(--white)',
+            padding: '1rem 1.5rem',
+            borderRadius: 'var(--radius-lg)',
+            marginBottom: '2rem',
+            backdropFilter: 'blur(10px)'
+          }}>
             {error}
           </div>
         )}
 
         {/* History Cards */}
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {history.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-              <p className="text-gray-500 text-lg">No history available yet</p>
-              <p className="text-gray-400 text-sm mt-2">Start logging meals to see your history!</p>
+            <div className="glass-card" style={{ 
+              padding: '3rem', 
+              textAlign: 'center',
+              animation: 'fadeIn 0.5s ease'
+            }}>
+              <p style={{ color: 'var(--gray-600)', fontSize: '1.25rem', marginBottom: '0.5rem' }}>
+                No history available yet
+              </p>
+              <p style={{ color: 'var(--gray-500)', fontSize: '1rem' }}>
+                Start logging meals to see your history!
+              </p>
             </div>
           ) : (
             history.map((day, index) => (
               <div
-                key={index}
-                className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition"
+                key={day.date || index}
+                className="glass-card"
+                style={{
+                  animation: `fadeIn 0.5s ease ${index * 0.1}s both`,
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = 'var(--shadow-xl)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
+                }}
               >
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+                  alignItems: window.innerWidth < 768 ? 'stretch' : 'center',
+                  justifyContent: 'space-between',
+                  gap: '1.5rem'
+                }}>
                   {/* Date and Status */}
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-800">
+                  <div style={{ flex: '1' }}>
+                    <h3 style={{ 
+                      fontSize: '1.25rem', 
+                      fontWeight: '700', 
+                      color: 'var(--gray-800)',
+                      marginBottom: '0.75rem'
+                    }}>
                       {formatDate(day.date)}
                     </h3>
-                    <div className={`inline-block mt-2 px-3 py-1 rounded-full border-2 font-semibold text-sm ${getComplianceColor(day.status)}`}>
-                      {getComplianceIcon(day.status)} {day.status.charAt(0).toUpperCase() + day.status.slice(1)}
+                    <div 
+                      style={{
+                        display: 'inline-block',
+                        padding: '0.5rem 1rem',
+                        borderRadius: 'var(--radius-full)',
+                        border: '2px solid',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        textTransform: 'capitalize',
+                        ...getComplianceStyle(day.status)
+                      }}
+                    >
+                      {getComplianceIcon(day.status)} {day.status.replace('-', ' ')}
                     </div>
                   </div>
 
                   {/* Calories */}
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-1">Calories</p>
-                    <p className="text-2xl font-bold text-blue-600">{day.totalCalories}</p>
-                    <p className="text-xs text-gray-500">of {day.target} cal</p>
+                  <div style={{ textAlign: 'center', minWidth: '120px' }}>
+                    <p style={{ 
+                      fontSize: '0.875rem', 
+                      color: 'var(--gray-600)', 
+                      marginBottom: '0.25rem' 
+                    }}>
+                      Calories
+                    </p>
+                    <p style={{ 
+                      fontSize: '2rem', 
+                      fontWeight: '700', 
+                      color: 'var(--primary-color)',
+                      marginBottom: '0.25rem'
+                    }}>
+                      {day.totalCalories}
+                    </p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>
+                      of {day.target} cal
+                    </p>
                   </div>
 
                   {/* Macros */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-600 mb-1">Protein</p>
-                      <p className="font-bold text-orange-600">{day.totalProtein}g</p>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(3, 1fr)', 
+                    gap: '1rem',
+                    minWidth: '200px'
+                  }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ 
+                        fontSize: '0.75rem', 
+                        color: 'var(--gray-600)', 
+                        marginBottom: '0.25rem' 
+                      }}>
+                        Protein
+                      </p>
+                      <p style={{ 
+                        fontWeight: '700', 
+                        color: '#ea580c',
+                        fontSize: '1.1rem'
+                      }}>
+                        {day.totalProtein}g
+                      </p>
                     </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-600 mb-1">Carbs</p>
-                      <p className="font-bold text-yellow-600">{day.totalCarbs}g</p>
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ 
+                        fontSize: '0.75rem', 
+                        color: 'var(--gray-600)', 
+                        marginBottom: '0.25rem' 
+                      }}>
+                        Carbs
+                      </p>
+                      <p style={{ 
+                        fontWeight: '700', 
+                        color: '#ca8a04',
+                        fontSize: '1.1rem'
+                      }}>
+                        {day.totalCarbs}g
+                      </p>
                     </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-600 mb-1">Fat</p>
-                      <p className="font-bold text-red-600">{day.totalFat}g</p>
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ 
+                        fontSize: '0.75rem', 
+                        color: 'var(--gray-600)', 
+                        marginBottom: '0.25rem' 
+                      }}>
+                        Fat
+                      </p>
+                      <p style={{ 
+                        fontWeight: '700', 
+                        color: '#dc2626',
+                        fontSize: '1.1rem'
+                      }}>
+                        {day.totalFat}g
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 {/* Difference */}
-                <div className="mt-4 pt-4 border-t">
+                <div style={{ 
+                  marginTop: '1.5rem', 
+                  paddingTop: '1.5rem', 
+                  borderTop: '1px solid var(--gray-200)' 
+                }}>
                   {day.status === 'on-track' && (
-                    <p className="text-sm text-green-700">
-                      ✓ Within 10% of target
+                    <p style={{ 
+                      fontSize: '0.875rem', 
+                      color: 'var(--success-color)',
+                      fontWeight: '500'
+                    }}>
+                      ✓ Within 10% of target - Great job!
                     </p>
                   )}
                   {day.status === 'over' && (
-                    <p className="text-sm text-red-700">
-                      ⚠ Over by {day.totalCalories - day.target} calories
+                    <p style={{ 
+                      fontSize: '0.875rem', 
+                      color: 'var(--error-color)',
+                      fontWeight: '500'
+                    }}>
+                      ⚠ Over by {Math.abs(day.difference)} calories
                     </p>
                   )}
                   {day.status === 'under' && (
-                    <p className="text-sm text-yellow-700">
-                      ↓ Under by {day.target - day.totalCalories} calories
+                    <p style={{ 
+                      fontSize: '0.875rem', 
+                      color: 'var(--warning-color)',
+                      fontWeight: '500'
+                    }}>
+                      ↓ Under by {Math.abs(day.difference)} calories
                     </p>
                   )}
                 </div>
@@ -165,25 +339,51 @@ export default function History() {
         </div>
 
         {/* Legend */}
-        <div className="mt-12 bg-white rounded-lg shadow-lg p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Compliance Status</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-              <p className="text-gray-700">
-                <span className="font-semibold">On Track:</span> Within 10% of target
+        <div className="glass-card" style={{ marginTop: '3rem' }}>
+          <h3 style={{ 
+            fontSize: '1.25rem', 
+            fontWeight: '700', 
+            color: 'var(--gray-800)', 
+            marginBottom: '1.5rem' 
+          }}>
+            Compliance Status Guide
+          </h3>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
+            gap: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ 
+                width: '1rem', 
+                height: '1rem', 
+                backgroundColor: 'var(--success-color)', 
+                borderRadius: '50%' 
+              }}></div>
+              <p style={{ color: 'var(--gray-700)' }}>
+                <span style={{ fontWeight: '600' }}>On Track:</span> Within 10% of target
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-              <p className="text-gray-700">
-                <span className="font-semibold">Over:</span> More than 10% above target
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ 
+                width: '1rem', 
+                height: '1rem', 
+                backgroundColor: 'var(--error-color)', 
+                borderRadius: '50%' 
+              }}></div>
+              <p style={{ color: 'var(--gray-700)' }}>
+                <span style={{ fontWeight: '600' }}>Over:</span> More than 10% above target
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-              <p className="text-gray-700">
-                <span className="font-semibold">Under:</span> More than 10% below target
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ 
+                width: '1rem', 
+                height: '1rem', 
+                backgroundColor: 'var(--warning-color)', 
+                borderRadius: '50%' 
+              }}></div>
+              <p style={{ color: 'var(--gray-700)' }}>
+                <span style={{ fontWeight: '600' }}>Under:</span> More than 10% below target
               </p>
             </div>
           </div>

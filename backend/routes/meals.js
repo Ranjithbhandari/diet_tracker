@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Meal from '../models/Meal.js';
 import { protect } from '../middleware/auth.js';
 
@@ -58,9 +59,21 @@ router.get('/today', protect, async (req, res) => {
       date: { $gte: today, $lt: tomorrow },
     }).sort({ createdAt: 1 });
 
+    // Calculate totals
+    const totals = meals.reduce(
+      (acc, meal) => ({
+        calories: acc.calories + meal.calories,
+        protein: acc.protein + meal.protein,
+        carbs: acc.carbs + meal.carbs,
+        fat: acc.fat + meal.fat,
+      }),
+      { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    );
+
     res.status(200).json({
       success: true,
       meals,
+      totals,
     });
   } catch (error) {
     res.status(500).json({
@@ -112,14 +125,15 @@ router.delete('/:id', protect, async (req, res) => {
 router.get('/history', protect, async (req, res) => {
   try {
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setHours(23, 59, 59, 999);
     const tenDaysAgo = new Date(today);
     tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+    tenDaysAgo.setHours(0, 0, 0, 0);
 
     const meals = await Meal.aggregate([
       {
         $match: {
-          userId: require('mongoose').Types.ObjectId(req.user.id),
+          userId: new mongoose.Types.ObjectId(req.user.id),
           date: { $gte: tenDaysAgo, $lte: today },
         },
       },
@@ -128,6 +142,7 @@ router.get('/history', protect, async (req, res) => {
           _id: {
             $dateToString: { format: '%Y-%m-%d', date: '$date' },
           },
+          date: { $first: '$date' },
           totalCalories: { $sum: '$calories' },
           totalProtein: { $sum: '$protein' },
           totalCarbs: { $sum: '$carbs' },
@@ -140,11 +155,36 @@ router.get('/history', protect, async (req, res) => {
       },
     ]);
 
+    // Add compliance status and target info
+    const userTarget = req.user.calorieTarget || 2000;
+    const historyWithStatus = meals.map(day => {
+      const difference = Math.abs(day.totalCalories - userTarget);
+      const percentageDiff = (difference / userTarget) * 100;
+      
+      let status;
+      if (percentageDiff <= 10) {
+        status = 'on-track';
+      } else if (day.totalCalories > userTarget) {
+        status = 'over';
+      } else {
+        status = 'under';
+      }
+
+      return {
+        ...day,
+        date: day._id,
+        target: userTarget,
+        status,
+        difference: day.totalCalories - userTarget,
+      };
+    });
+
     res.status(200).json({
       success: true,
-      history: meals,
+      history: historyWithStatus,
     });
   } catch (error) {
+    console.error('History error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Server error',

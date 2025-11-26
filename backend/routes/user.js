@@ -68,6 +68,8 @@ router.put('/profile', protect, async (req, res) => {
         activityLevel,
         goal,
         dietType,
+        bmr: assessment.bmr,
+        tdee: assessment.tdee,
         calorieTarget: assessment.calorieTarget,
         macros: assessment.macros,
       },
@@ -78,6 +80,44 @@ router.put('/profile', protect, async (req, res) => {
       success: true,
       user,
       assessment,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error',
+    });
+  }
+});
+
+// @route   PUT /api/user/settings
+// @desc    Update user settings
+// @access  Private
+router.put('/settings', protect, async (req, res) => {
+  try {
+    const { customCalorieTarget, useCustomTarget } = req.body;
+
+    // Validation
+    if (useCustomTarget && (!customCalorieTarget || customCalorieTarget < 500 || customCalorieTarget > 10000)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Custom calorie target must be between 500 and 10,000',
+      });
+    }
+
+    // Update user settings
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        customCalorieTarget: customCalorieTarget ? parseInt(customCalorieTarget) : undefined,
+        useCustomTarget: Boolean(useCustomTarget),
+      },
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      user,
+      message: 'Settings updated successfully',
     });
   } catch (error) {
     res.status(500).json({

@@ -43,6 +43,18 @@ const mealSchema = new mongoose.Schema(
       required: [true, 'Fat is required'],
       min: [0, 'Fat cannot be negative'],
     },
+    foods: [{
+      foodName: String,
+      calories: Number,
+      protein: Number,
+      carbs: Number,
+      fat: Number,
+      quantity: Number,
+      baseCalories: Number,
+      baseProtein: Number,
+      baseCarbs: Number,
+      baseFat: Number,
+    }],
   },
   { timestamps: true }
 );

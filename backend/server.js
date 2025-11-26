@@ -5,6 +5,7 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
 import mealRoutes from './routes/meals.js';
+import activityRoutes from './routes/activities.js';
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ app.use(cors({
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/meals', mealRoutes);
+app.use('/api/activities', activityRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

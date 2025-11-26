@@ -1,7 +1,8 @@
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Navbar from './components/Navbar';
+import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
@@ -10,7 +11,9 @@ import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Profile from './pages/Profile.jsx';
 import AddMeal from './pages/AddMeal.jsx';
+import Activity from './pages/Activity.jsx';
 import History from './pages/History.jsx';
+import Settings from './pages/Settings.jsx';
 
 
 
@@ -19,62 +22,93 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+          <p style={{ color: '#ffffff', fontSize: '1.1rem' }}>Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <>
-      {user && <Navbar />}
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
-        <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
-        <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
+      <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
 
-        {/* Protected Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
+      {/* Protected Routes with Layout */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Layout>
               <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Layout>
               <Profile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/add-meal"
-          element={
-            <ProtectedRoute>
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/add-meal"
+        element={
+          <ProtectedRoute>
+            <Layout>
               <AddMeal />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/history"
-          element={
-            <ProtectedRoute>
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activity"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Activity />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/history"
+        element={
+          <ProtectedRoute>
+            <Layout>
               <History />
-            </ProtectedRoute>
-          }
-        />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Settings />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
 
-        {/* Catch all */}
-        <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} />} />
-      </Routes>
-    </>
+      {/* Catch all */}
+      <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} />} />
+    </Routes>
   );
 }
 
@@ -82,6 +116,32 @@ export default function App() {
   return (
     <Router>
       <AuthProvider>
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+              borderRadius: '10px',
+              padding: '16px',
+            },
+            success: {
+              duration: 3000,
+              iconTheme: {
+                primary: '#10b981',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              duration: 4000,
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
         <AppContent />
       </AuthProvider>
     </Router>

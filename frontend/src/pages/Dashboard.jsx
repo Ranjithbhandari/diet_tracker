@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import ProgressCircle from '../components/ProgressCircle';
@@ -9,6 +10,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [meals, setMeals] = useState([]);
+  const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [totals, setTotals] = useState({
@@ -17,20 +19,45 @@ export default function Dashboard() {
     carbs: 0,
     fat: 0,
   });
+  const [totalCaloriesBurned, setTotalCaloriesBurned] = useState(0);
 
   useEffect(() => {
-    fetchTodaysMeals();
+    fetchTodaysData();
+    
+    // Listen for meal and activity additions
+    const handleDataUpdate = () => {
+      fetchTodaysData();
+    };
+    
+    window.addEventListener('mealAdded', handleDataUpdate);
+    window.addEventListener('activityAdded', handleDataUpdate);
+    window.addEventListener('settingsUpdated', handleDataUpdate);
+    
+    return () => {
+      window.removeEventListener('mealAdded', handleDataUpdate);
+      window.removeEventListener('activityAdded', handleDataUpdate);
+      window.removeEventListener('settingsUpdated', handleDataUpdate);
+    };
   }, []);
 
-  const fetchTodaysMeals = async () => {
+  const fetchTodaysData = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/meals/today');
-      setMeals(response.data.meals || []);
-      setTotals(response.data.totals || { calories: 0, protein: 0, carbs: 0, fat: 0 });
+      
+      // Fetch meals and activities in parallel
+      const [mealsResponse, activitiesResponse] = await Promise.all([
+        api.get('/meals/today'),
+        api.get('/activities/today').catch(() => ({ data: { activities: [], totalCaloriesBurned: 0 } }))
+      ]);
+      
+      setMeals(mealsResponse.data.meals || []);
+      setTotals(mealsResponse.data.totals || { calories: 0, protein: 0, carbs: 0, fat: 0 });
+      setActivities(activitiesResponse.data.activities || []);
+      setTotalCaloriesBurned(activitiesResponse.data.totalCaloriesBurned || 0);
       setError('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch meals');
+      console.error('Dashboard fetch error:', err);
+      setError(err.response?.data?.message || 'Failed to fetch data');
     } finally {
       setLoading(false);
     }
@@ -41,133 +68,447 @@ export default function Dashboard() {
 
     try {
       await api.delete(`/meals/${mealId}`);
-      setMeals(meals.filter(m => m._id !== mealId));
-      setTotals(prev => ({
-        calories: prev.calories - meals.find(m => m._id === mealId).calories,
-        protein: prev.protein - meals.find(m => m._id === mealId).protein,
-        carbs: prev.carbs - meals.find(m => m._id === mealId).carbs,
-        fat: prev.fat - meals.find(m => m._id === mealId).fat,
-      }));
+      toast.success('🗑️ Meal deleted successfully');
+      // Refresh data to get updated totals
+      fetchTodaysData();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete meal');
+      toast.error(err.response?.data?.message || 'Failed to delete meal');
     }
   };
 
-  const calorieTarget = user?.calorieTarget || 2000;
-  const remaining = Math.max(0, calorieTarget - totals.calories);
-  const percentage = Math.min(100, (totals.calories / calorieTarget) * 100);
+  const calorieTarget = user?.useCustomTarget 
+    ? (user?.customCalorieTarget || 2000)
+    : (user?.calorieTarget || 2000);
+  const netCalories = totals.calories - totalCaloriesBurned;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your meals...</p>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+          <p style={{ color: '#ffffff', fontSize: '1.1rem' }}>Loading your dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div style={{ 
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '2rem 1rem'
+    }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">Today's Progress</h1>
-          <p className="text-gray-600">Track your daily nutrition intake</p>
+        <div style={{ marginBottom: '3rem', textAlign: 'center' }}>
+          <h1 style={{ 
+            fontSize: '3.5rem', 
+            fontWeight: '800', 
+            color: '#ffffff',
+            marginBottom: '0.5rem',
+            textShadow: '0 4px 8px rgba(0,0,0,0.2)',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>
+            Welcome back, {user?.name?.split(' ')[0]}! 🌟
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '1.3rem', fontWeight: '500' }}>
+            Track your daily nutrition and fitness journey with precision
+          </p>
         </div>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            {error}
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.95)',
+            border: '2px solid #ef4444',
+            color: '#ffffff',
+            padding: '1rem 1.5rem',
+            borderRadius: '1rem',
+            marginBottom: '2rem',
+            backdropFilter: 'blur(10px)',
+            textAlign: 'center',
+            fontWeight: '600'
+          }}>
+            ⚠️ {error}
           </div>
         )}
 
-        {/* Progress Section */}
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-            {/* Progress Circle */}
-            <div className="flex justify-center">
-              <ProgressCircle
-                current={totals.calories}
-                target={calorieTarget}
-                size={200}
-              />
+        {/* Main Progress Section - Separate Cards */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
+          gap: '2rem',
+          marginBottom: '3rem'
+        }}>
+          {/* Calories Consumed Today */}
+          <div className="glass-card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ 
+                fontSize: '1.5rem', 
+                fontWeight: '700', 
+                color: '#1f2937',
+                marginBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}>
+                🍽️ Calories Consumed
+              </h2>
+              <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>Today's intake</p>
             </div>
-
-            {/* Stats */}
-            <div className="space-y-4">
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-1">Calories Consumed</p>
-                <p className="text-3xl font-bold text-blue-600">{totals.calories}</p>
-                <p className="text-xs text-gray-500 mt-1">of {calorieTarget} cal target</p>
-              </div>
-
-              <div className="bg-green-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-1">Remaining</p>
-                <p className="text-3xl font-bold text-green-600">{remaining}</p>
-                <p className="text-xs text-gray-500 mt-1">calories available</p>
-              </div>
-
-              {totals.calories > calorieTarget && (
-                <div className="bg-red-50 rounded-lg p-4 border-l-4 border-red-500">
-                  <p className="text-sm font-semibold text-red-700">
-                    ⚠️ Over Target by {totals.calories - calorieTarget} calories
-                  </p>
-                </div>
-              )}
-
-              {percentage >= 100 && totals.calories <= calorieTarget * 1.1 && (
-                <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
-                  <p className="text-sm font-semibold text-green-700">
-                    ✓ On Track!
-                  </p>
-                </div>
-              )}
+            
+            <ProgressCircle
+              current={totals.calories}
+              target={calorieTarget}
+              size={180}
+              type="consumed"
+              showPercentage={true}
+            />
+            
+            <div style={{ marginTop: '1.5rem' }}>
+              <p style={{ 
+                fontSize: '2rem', 
+                fontWeight: '800', 
+                color: '#1f2937',
+                marginBottom: '0.25rem'
+              }}>
+                {totals.calories}
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                of {calorieTarget} kcal target
+              </p>
             </div>
           </div>
 
-          {/* Macros */}
-          <div className="mt-8 pt-8 border-t">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Macronutrients</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-orange-50 rounded-lg p-4 text-center">
-                <p className="text-sm text-gray-600 mb-1">Protein</p>
-                <p className="text-2xl font-bold text-orange-600">{totals.protein}g</p>
-              </div>
-              <div className="bg-yellow-50 rounded-lg p-4 text-center">
-                <p className="text-sm text-gray-600 mb-1">Carbs</p>
-                <p className="text-2xl font-bold text-yellow-600">{totals.carbs}g</p>
-              </div>
-              <div className="bg-red-50 rounded-lg p-4 text-center">
-                <p className="text-sm text-gray-600 mb-1">Fat</p>
-                <p className="text-2xl font-bold text-red-600">{totals.fat}g</p>
-              </div>
+          {/* Calories Burned Today */}
+          <div className="glass-card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ 
+                fontSize: '1.5rem', 
+                fontWeight: '700', 
+                color: '#1f2937',
+                marginBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}>
+                🔥 Calories Burned
+              </h2>
+              <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>Today's activity</p>
+            </div>
+            
+            <ProgressCircle
+              current={totalCaloriesBurned}
+              target={Math.max(500, totalCaloriesBurned || 300)} // Dynamic target or minimum 500
+              size={180}
+              type="burned"
+              showPercentage={false}
+            />
+            
+            <div style={{ marginTop: '1.5rem' }}>
+              <p style={{ 
+                fontSize: '2rem', 
+                fontWeight: '800', 
+                color: '#1f2937',
+                marginBottom: '0.25rem'
+              }}>
+                {totalCaloriesBurned}
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                calories burned • {activities.length} activities
+              </p>
+            </div>
+          </div>
+
+          {/* Net Calories */}
+          <div className="glass-card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ 
+                fontSize: '1.5rem', 
+                fontWeight: '700', 
+                color: '#1f2937',
+                marginBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}>
+                ⚖️ Net Calories
+              </h2>
+              <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>Consumed - Burned</p>
+            </div>
+            
+            <ProgressCircle
+              current={netCalories}
+              target={calorieTarget}
+              size={180}
+              type="net"
+              showPercentage={false}
+            />
+            
+            <div style={{ marginTop: '1.5rem' }}>
+              <p style={{ 
+                fontSize: '2rem', 
+                fontWeight: '800', 
+                color: netCalories > calorieTarget * 1.1 ? '#ef4444' : 
+                       netCalories < calorieTarget * 0.9 ? '#10b981' : '#6366f1',
+                marginBottom: '0.25rem'
+              }}>
+                {netCalories > 0 ? '+' : ''}{netCalories}
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                {netCalories > calorieTarget * 1.1 ? 'Surplus' : 
+                 netCalories < calorieTarget * 0.9 ? 'Deficit' : 'Maintenance'}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Add Meal Button */}
-        <div className="mb-8">
+        {/* Macronutrients Section */}
+        <div className="glass-card" style={{ marginBottom: '3rem' }}>
+          <h2 style={{ 
+            fontSize: '1.8rem', 
+            fontWeight: '700', 
+            color: '#1f2937', 
+            marginBottom: '2rem',
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem'
+          }}>
+            🥗 Today's Macronutrients
+          </h2>
+          
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)', 
+            gap: '2rem' 
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.1) 0%, rgba(251, 146, 60, 0.05) 100%)',
+              borderRadius: '1.5rem',
+              padding: '2rem',
+              textAlign: 'center',
+              border: '2px solid rgba(234, 88, 12, 0.2)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '-50%',
+                right: '-50%',
+                width: '100%',
+                height: '100%',
+                background: 'radial-gradient(circle, rgba(234, 88, 12, 0.1) 0%, transparent 70%)',
+                pointerEvents: 'none'
+              }} />
+              <p style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🥩</p>
+              <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem', fontWeight: '600' }}>
+                Protein
+              </p>
+              <p style={{ fontSize: '2.5rem', fontWeight: '800', color: '#ea580c', marginBottom: '0.25rem' }}>
+                {totals.protein}g
+              </p>
+              <p style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                Target: {user?.macros?.protein || 0}g
+              </p>
+            </div>
+            
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(202, 138, 4, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
+              borderRadius: '1.5rem',
+              padding: '2rem',
+              textAlign: 'center',
+              border: '2px solid rgba(202, 138, 4, 0.2)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '-50%',
+                right: '-50%',
+                width: '100%',
+                height: '100%',
+                background: 'radial-gradient(circle, rgba(202, 138, 4, 0.1) 0%, transparent 70%)',
+                pointerEvents: 'none'
+              }} />
+              <p style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🍞</p>
+              <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem', fontWeight: '600' }}>
+                Carbohydrates
+              </p>
+              <p style={{ fontSize: '2.5rem', fontWeight: '800', color: '#ca8a04', marginBottom: '0.25rem' }}>
+                {totals.carbs}g
+              </p>
+              <p style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                Target: {user?.macros?.carbs || 0}g
+              </p>
+            </div>
+            
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(248, 113, 113, 0.05) 100%)',
+              borderRadius: '1.5rem',
+              padding: '2rem',
+              textAlign: 'center',
+              border: '2px solid rgba(220, 38, 38, 0.2)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '-50%',
+                right: '-50%',
+                width: '100%',
+                height: '100%',
+                background: 'radial-gradient(circle, rgba(220, 38, 38, 0.1) 0%, transparent 70%)',
+                pointerEvents: 'none'
+              }} />
+              <p style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🥑</p>
+              <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem', fontWeight: '600' }}>
+                Fats
+              </p>
+              <p style={{ fontSize: '2.5rem', fontWeight: '800', color: '#dc2626', marginBottom: '0.25rem' }}>
+                {totals.fat}g
+              </p>
+              <p style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                Target: {user?.macros?.fat || 0}g
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+          gap: '1.5rem',
+          marginBottom: '3rem'
+        }}>
           <button
             onClick={() => navigate('/add-meal')}
-            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:shadow-lg transition"
+            className="btn btn-primary"
+            style={{
+              padding: '1.5rem 2rem',
+              fontSize: '1.2rem',
+              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              border: 'none',
+              borderRadius: '1.5rem',
+              color: '#ffffff',
+              fontWeight: '700',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 10px 25px rgba(79, 172, 254, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.75rem'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.transform = 'translateY(-3px)';
+              e.target.style.boxShadow = '0 15px 35px rgba(79, 172, 254, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 10px 25px rgba(79, 172, 254, 0.3)';
+            }}
           >
-            + Add Meal
+            🍽️ Add Meal
+          </button>
+          <button
+            onClick={() => navigate('/activity')}
+            className="btn btn-primary"
+            style={{
+              padding: '1.5rem 2rem',
+              fontSize: '1.2rem',
+              background: 'linear-gradient(135deg, #ff6b6b 0%, #feca57 100%)',
+              border: 'none',
+              borderRadius: '1.5rem',
+              color: '#ffffff',
+              fontWeight: '700',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 10px 25px rgba(255, 107, 107, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.75rem'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.transform = 'translateY(-3px)';
+              e.target.style.boxShadow = '0 15px 35px rgba(255, 107, 107, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 10px 25px rgba(255, 107, 107, 0.3)';
+            }}
+          >
+            💪 Log Activity
           </button>
         </div>
 
         {/* Meals List */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Today's Meals</h2>
+        <div className="glass-card">
+          <h2 style={{ 
+            fontSize: '1.8rem', 
+            fontWeight: '700', 
+            color: '#1f2937', 
+            marginBottom: '2rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            📋 Today's Meals
+          </h2>
 
           {meals.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No meals logged yet</p>
-              <p className="text-gray-400 text-sm mt-2">Add your first meal to get started!</p>
+            <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+              <div style={{ 
+                fontSize: '4rem', 
+                marginBottom: '1.5rem',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text'
+              }}>
+                🍽️
+              </div>
+              <p style={{ color: '#4b5563', fontSize: '1.4rem', marginBottom: '0.75rem', fontWeight: '600' }}>
+                No meals logged yet
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '1.1rem', marginBottom: '2rem' }}>
+                Add your first meal to start tracking your nutrition journey!
+              </p>
+              <button
+                onClick={() => navigate('/add-meal')}
+                style={{
+                  padding: '1rem 2rem',
+                  background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                  border: 'none',
+                  borderRadius: '1rem',
+                  color: '#ffffff',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  fontSize: '1rem'
+                }}
+                onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+              >
+                🍽️ Add Your First Meal
+              </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {meals.map(meal => (
                 <MealCard
                   key={meal._id}

@@ -60,6 +60,25 @@ const userSchema = new mongoose.Schema(
       min: 500,
       max: 10000,
     },
+    customCalorieTarget: {
+      type: Number,
+      min: 500,
+      max: 10000,
+    },
+    useCustomTarget: {
+      type: Boolean,
+      default: false,
+    },
+    bmr: {
+      type: Number,
+      min: 500,
+      max: 5000,
+    },
+    tdee: {
+      type: Number,
+      min: 500,
+      max: 10000,
+    },
     macros: {
       protein: Number,
       carbs: Number,
