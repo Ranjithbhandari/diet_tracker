@@ -1,3 +1,4 @@
+// server.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -16,20 +17,27 @@ dotenv.config();
 
 const app = express();
 
-// Connect to database
+// Connect to database (make sure connectDB uses process.env.MONGO_URI)
 connectDB();
 
-// Middleware
+// Middlewares
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// CORS configuration - FIXED
-app.use(cors({
-  origin: 'http://localhost:5173',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+// CORS: read allowed origin from env (set CLIENT_URL in Render to your frontend URL).
+// Fallback to localhost:5173 for local dev.
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+app.use(
+  cors({
+    origin: CLIENT_URL,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
+// Optional: trust proxy if behind a proxy/load balancer (Render/Railway). Uncomment if needed.
+// app.set('trust proxy', 1);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -43,16 +51,16 @@ app.use('/api/recipes', recipeRoutes);
 app.use('/api/fasting', fastingRoutes);
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    success: true, 
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({
+    success: true,
     message: 'Server is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
 // Test route
-app.get('/api/test', (req, res) => {
+app.get('/api/test', (_req, res) => {
   res.json({ message: 'API is working!' });
 });
 
@@ -65,22 +73,22 @@ app.use((req, res) => {
 });
 
 // Global error handler
-app.use((err, req, res, next) => {
+app.use((err, _req, res, _next) => {
   console.error('Error:', err);
-  
+
   if (err.name === 'ValidationError') {
-    const errors = Object.values(err.errors).map(e => e.message);
+    const errors = Object.values(err.errors).map((e) => e.message);
     return res.status(400).json({
       success: false,
       message: 'Validation Error',
-      errors
+      errors,
     });
   }
 
   if (err.code === 11000) {
     return res.status(400).json({
       success: false,
-      message: 'Duplicate field value entered'
+      message: 'Duplicate field value entered',
     });
   }
 
@@ -90,12 +98,30 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Start server
 const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+  // Render (and some hosts) expose a public URL in envs — helpful to log
+  if (process.env.RENDER_EXTERNAL_URL) {
+    console.log(`🔗 Public URL (Render): ${process.env.RENDER_EXTERNAL_URL}`);
+    console.log(`🔗 Health check: ${process.env.RENDER_EXTERNAL_URL}/api/health`);
+  } else {
+    console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+  }
 });
+
+// Graceful shutdown (good practice on managed hosts)
+const shutdown = (signal) => {
+  console.log(`\n⚠️ Received ${signal}. Closing server...`);
+  server.close(() => {
+    console.log('HTTP server closed.');
+    // close DB connection if your connectDB exposes a close method (optional)
+    process.exit(0);
+  });
+};
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 export default app;
